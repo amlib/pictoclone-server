@@ -1,5 +1,6 @@
 import uWS from 'uWebSockets.js'
 import { ChatServer } from './src/ChatServer.js'
+import { messageTypesStr, messageTypesInt } from "./src/enums.js";
 
 const chatServer = new ChatServer()
 const textDec = new TextDecoder("utf-8")
@@ -28,7 +29,7 @@ const app = uWS.App().ws('/*', {
       }
     } catch (e) {
       const response = {
-        type: 'genericErrorResult',
+        type: messageTypesStr.get('genericErrorResult'),
         errorCode: 'ERROR_GENERIC_ERROR',
         errorMessage: e
       }

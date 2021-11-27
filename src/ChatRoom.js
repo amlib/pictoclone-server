@@ -1,5 +1,5 @@
 import { ChatUser } from "./ChatUser.js";
-import { messageTypes, messageTypesIndex} from "./enums.js";
+import {messageTypesStr, messageTypesInt } from "./enums.js";
 
 export class ChatRoom {
   code
@@ -62,7 +62,7 @@ export class ChatRoom {
 
       // TODO dont send if processedChatMessages is empty
       const response = {
-        type: 'receiveChatMessages',
+        type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
         chatMessages: processedChatMessages
       }
 

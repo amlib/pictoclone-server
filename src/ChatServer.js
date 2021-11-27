@@ -12,9 +12,9 @@ export class ChatServer {
   queueFlushTimeout
 
   constructor () {
-    this.incomingMessageMap.set('createRoom', this.createRoom)
-    this.incomingMessageMap.set('connectRoom', this.connectRoom)
-    this.incomingMessageMap.set('sendChatMessage', this.sendChatMessage)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CREATE_ROOM'), this.createRoom)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CONNECT_ROOM'), this.connectRoom)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE'), this.sendChatMessage)
   }
 
   addNewConnection (ws) {
@@ -23,7 +23,7 @@ export class ChatServer {
     console.log('A WebSocket connected!', uniqueId);
 
     let response = {
-      type: 'newConnectionResult',
+      type: messageTypesStr.get('MSG_TYPE_NEW_CONNECTION_RESULT'),
       uniqueId: uniqueId
     }
 
@@ -42,7 +42,7 @@ export class ChatServer {
     }
 
     if (message.uniqueId == null) {
-      response.type = message.type + 'Result'
+      response.type = messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
       response.errorCode = 'ERROR_NO_UNIQUE_ID'
       response.errorMessage = ''
@@ -52,7 +52,7 @@ export class ChatServer {
     // TODO check if uniqueId _value_ is valid?
 
     if (message.uniqueId !== ws.uniqueId) {
-      response.type = message.type + 'Result'
+      response.type =messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
       response.errorCode = 'ERROR_INVALID_UNIQUE_ID'
       response.errorMessage = ''
@@ -61,7 +61,7 @@ export class ChatServer {
 
     const callback = this.incomingMessageMap.get(message.type)
     if (callback != null) {
-      console.log('handleIncomingMessage:', message.type, message.uniqueId)
+      console.log('handleIncomingMessage:', messageTypesInt.get(message.type), message.uniqueId)
       response = callback.call(this, message)
     } else {
       console.warn('handleIncomingMessage: unknown message type: ' + message.type)
@@ -72,7 +72,7 @@ export class ChatServer {
 
   createRoom (message) {
     const response = {
-      type: 'createRoomResult',
+      type: messageTypesStr.get('MSG_TYPE_CREATE_ROOM_RESULT'),
       code: message.code,
     }
 
@@ -95,7 +95,7 @@ export class ChatServer {
 
   connectRoom (message) {
     const response = {
-      type: 'connectRoomResult',
+      type: messageTypesStr.get('MSG_TYPE_CONNECT_ROOM_RESULT'),
       code: message.code,
     }
 
@@ -132,7 +132,7 @@ export class ChatServer {
 
   sendChatMessage (message) {
     const response = {
-      type: 'sendChatMessageResult'
+      type: messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE_RESULT')
     }
 
     const existingRoom = this.uniqueIdRoomMap.get(message.uniqueId)
