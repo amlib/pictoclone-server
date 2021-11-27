@@ -1,11 +1,10 @@
-// const uWS = require('uWebSockets.js')
 import uWS from 'uWebSockets.js'
-const port = 9001
-
 import { ChatServer } from './src/ChatServer.js'
+
 const chatServer = new ChatServer()
 const textDec = new TextDecoder("utf-8")
 const textEnc = new TextEncoder("utf-8")
+const port = 9001
 
 const app = uWS.App().ws('/*', {
   /* Options */
@@ -14,16 +13,27 @@ const app = uWS.App().ws('/*', {
   idleTimeout: 10,
   /* Handlers */
   open: (ws) => {
-    console.log('A WebSocket connected!');
+    const response = chatServer.addNewConnection(ws)
+    let ok = ws.send(JSON.stringify(response), false);
   },
   message: (ws, payload, isBinary) => {
     const string = textDec.decode(new Uint8Array(payload))
-    const message = JSON.parse(string)
-    let response = chatServer.handleIncomingMessage(message)
+    try {
+      const message = JSON.parse(string)
+      let response = chatServer.handleIncomingMessage(message, ws)
 
-    /* Ok is false if backpressure was built up, wait for drain */
-    if (response != null) {
+      /* Ok is false if backpressure was built up, wait for drain */
+      if (response != null) {
         let ok = ws.send(JSON.stringify(response), isBinary);
+      }
+    } catch (e) {
+      const response = {
+        type: 'genericErrorResult',
+        errorCode: 'ERROR_GENERIC_ERROR',
+        errorMessage: e
+      }
+      let ok = ws.send(JSON.stringify(response), isBinary);
+      throw e
     }
   },
   drain: (ws) => {
