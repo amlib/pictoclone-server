@@ -1,5 +1,5 @@
 import { ChatRoom } from "./ChatRoom.js";
-import { messageTypesStr, messageTypesInt } from "./enums.js";
+import { messageTypesStr, messageTypesInt, errorsStr, errorsInt } from './enums.js'
 
 export class ChatServer {
   incomingMessageMap = new Map()
@@ -44,7 +44,7 @@ export class ChatServer {
     if (message.uniqueId == null) {
       response.type = messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
-      response.errorCode = 'ERROR_NO_UNIQUE_ID'
+      response.errorCode = errorsStr.get('ERROR_NO_UNIQUE_ID')
       response.errorMessage = ''
       return response
     }
@@ -54,7 +54,7 @@ export class ChatServer {
     if (message.uniqueId !== ws.uniqueId) {
       response.type =messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
-      response.errorCode = 'ERROR_INVALID_UNIQUE_ID'
+      response.errorCode = errorsStr.get('ERROR_INVALID_UNIQUE_ID')
       response.errorMessage = ''
       return response
     }
@@ -79,7 +79,7 @@ export class ChatServer {
     const existingRoom = this.roomCodeMap.get(message.code)
     if (existingRoom != null) {
       response.success = false
-      response.errorCode = 'ERROR_ROOM_ALREADY_EXISTS'
+      response.errorCode = errorsStr.get('ERROR_ROOM_ALREADY_EXISTS')
       response.errorMessage = 'Room ' + message.code + ' already exists'
       return response
     }
@@ -104,21 +104,21 @@ export class ChatServer {
     const existingRoom = this.roomCodeMap.get(message.code)
     if (existingRoom == null) {
       response.success = false
-      response.errorCode = 'ERROR_ROOM_DOES_NOT_EXISTS'
+      response.errorCode = errorsStr.get('ERROR_ROOM_DOES_NOT_EXISTS')
       response.errorMessage = 'Room ' + message.code + ' does not exists'
       return response
     }
 
     if (!existingRoom.checkFreeSlot) {
       response.success = false
-      response.errorCode = 'ERROR_ROOM_NO_FREE_SLOTS'
+      response.errorCode = errorsStr.get('ERROR_ROOM_NO_FREE_SLOTS')
       response.errorMessage = 'Room ' + message.code + ' is full'
       return response
     }
 
     if (!existingRoom.checkFreeUserName(message.userName)) {
       response.success = false
-      response.errorCode = 'ERROR_ROOM_USER_ALREADY_TAKEN'
+      response.errorCode = errorsStr.get('ERROR_ROOM_USER_ALREADY_TAKEN')
       response.errorMessage = 'User ' + message.userName + ' already taken for this room'
       return response
     }

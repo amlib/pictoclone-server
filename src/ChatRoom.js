@@ -1,5 +1,5 @@
 import { ChatUser } from "./ChatUser.js";
-import {messageTypesStr, messageTypesInt } from "./enums.js";
+import { messageTypesStr, messageTypesInt, errorsStr, errorsInt } from './enums.js'
 
 export class ChatRoom {
   code
