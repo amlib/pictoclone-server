@@ -6,7 +6,7 @@ export class ChatRoom {
   maxSlots = 3
   uniqueIdUserMap = new Map() // 1234: ChatUser()
   userNameUserMap = new Map() // foobar: ChatUser()
-  chatMessageQueue = []
+  chatMessageQueue = [] // [ {...}, {...}, ...]
 
   constructor(code) {
     this.code = code
@@ -26,12 +26,20 @@ export class ChatRoom {
     this.userNameUserMap.set(userName, user)
   }
 
+  removeUser (uniqueId) {
+    const user = this.uniqueIdUserMap.get(uniqueId)
+    this.userNameUserMap.delete(user.name)
+    this.uniqueIdUserMap.delete(uniqueId)
+  }
+
   addMessage (uniqueId, messagePayload) {
     // TODO Validate fields such as timestamp?
+    const user =  this.uniqueIdUserMap.get(uniqueId)
     this.chatMessageQueue.push({
-      uniqueId: uniqueId,
+      uniqueId: uniqueId, // Make sure uniqueId is never given to other users along with the message!
       text: messagePayload.text,
-      timestamp: messagePayload.timestamp
+      timestamp: messagePayload.timestamp,
+      userName: user.name
     })
 
     return true
@@ -40,11 +48,9 @@ export class ChatRoom {
   flushChatMessageQueueToRecipients (uniqueIdSocketMap) {
     const chatMessageQueue = this.chatMessageQueue
     this.chatMessageQueue = []
-    for (let i = 0; i < chatMessageQueue.length; ++i) {
-      const message = chatMessageQueue[i]
-      const user =  this.uniqueIdUserMap.get(message.uniqueId)
-      message.userName = user.name
-    }
+    // for (let i = 0; i < chatMessageQueue.length; ++i) {
+    //   const message = chatMessageQueue[i]
+    // }
 
     for (let [uniqueId, user] of this.uniqueIdUserMap) {
       const ws = uniqueIdSocketMap.get(uniqueId)
@@ -60,13 +66,14 @@ export class ChatRoom {
         }
       }
 
-      // TODO dont send if processedChatMessages is empty
-      const response = {
-        type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
-        chatMessages: processedChatMessages
-      }
+      if (processedChatMessages.length > 0) {
+        const response = {
+          type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
+          chatMessages: processedChatMessages
+        }
 
-      ws.send(JSON.stringify(response), false);
+        ws.send(JSON.stringify(response), false);
+      }
     }
   }
 }

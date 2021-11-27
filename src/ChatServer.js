@@ -4,23 +4,23 @@ import { messageTypesStr, messageTypesInt, errorsStr, errorsInt } from './enums.
 export class ChatServer {
   incomingMessageMap = new Map()
 
-  chatRooms = []
   roomCodeMap = new Map() // 9999: Room()
   uniqueIdRoomMap = new Map() // 1234: Room()
   uniqueIdSocketMap = new Map() // 1234: ws()
-  roomFlushQueue = new Set()
+  roomFlushQueue = new Set() // [Room(), Room(), ...]
   queueFlushTimeout
 
   constructor () {
-    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CREATE_ROOM'), this.createRoom)
-    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CONNECT_ROOM'), this.connectRoom)
-    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE'), this.sendChatMessage)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CREATE_ROOM'), this.handleCreateRoom)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CONNECT_ROOM'), this.handleConnectRoom)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE'), this.handleSendChatMessage)
+    this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_LEAVE_ROOM'), this.handleLeaveRoom)
   }
 
   addNewConnection (ws) {
     const uniqueId = Math.round(Math.random() * 100000) // TODO use uuid
     ws.uniqueId = uniqueId
-    console.log('A WebSocket connected!', uniqueId);
+    console.log('addNewConnection:', uniqueId);
 
     let response = {
       type: messageTypesStr.get('MSG_TYPE_NEW_CONNECTION_RESULT'),
@@ -32,7 +32,20 @@ export class ChatServer {
     return response
   }
 
-  /* Incoming message */
+
+  closeConnection (ws) {
+    const currentRoom = this.uniqueIdRoomMap.get(ws.uniqueId)
+    console.log('closeConnection:', ws.uniqueId);
+
+    if (currentRoom != null) {
+      currentRoom.removeUser(ws.uniqueId)
+    }
+
+    this.uniqueIdSocketMap.delete(ws.uniqueId)
+    this.uniqueIdRoomMap.delete(ws.uniqueId)
+  }
+
+  /* Incoming message handlers */
 
   handleIncomingMessage (message, ws) {
     let response = {}
@@ -70,7 +83,7 @@ export class ChatServer {
     return response
   }
 
-  createRoom (message) {
+  handleCreateRoom (message) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CREATE_ROOM_RESULT'),
       code: message.code,
@@ -87,13 +100,12 @@ export class ChatServer {
     const chatRoom = new ChatRoom(message.code)
 
     this.roomCodeMap.set(chatRoom.code, chatRoom)
-    this.chatRooms.push(chatRoom)
 
     response.success = true
     return response
   }
 
-  connectRoom (message) {
+  handleConnectRoom (message) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CONNECT_ROOM_RESULT'),
       code: message.code,
@@ -130,7 +142,27 @@ export class ChatServer {
     return response
   }
 
-  sendChatMessage (message) {
+  handleLeaveRoom (message) {
+    const response = {
+      type: messageTypesStr.get('MSG_TYPE_LEAVE_ROOM_RESULT')
+    }
+
+    const currentRoom = this.uniqueIdRoomMap.get(message.uniqueId)
+
+    if (currentRoom != null) {
+      currentRoom.removeUser(message.uniqueId)
+    } else {
+      response.success = false
+      response.errorCode = errorsStr.get('ERROR_ROOM_NOT_IN_ANY_ROOM')
+      response.errorMessage = 'User ' + message.userName + ' not in any room'
+      return response
+    }
+
+    response.success = true
+    return response
+  }
+
+  handleSendChatMessage (message) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE_RESULT')
     }

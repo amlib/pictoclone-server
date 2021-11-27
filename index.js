@@ -10,8 +10,8 @@ const port = 9001
 const app = uWS.App().ws('/*', {
   /* Options */
   compression: uWS.SHARED_COMPRESSOR,
-  maxPayloadLength: 16 * 1024 * 1024,
-  idleTimeout: 10,
+  maxPayloadLength: 32 * 1024, // bytes
+  idleTimeout: 32,
   /* Handlers */
   open: (ws) => {
     const response = chatServer.addNewConnection(ws)
@@ -41,10 +41,11 @@ const app = uWS.App().ws('/*', {
     console.log('WebSocket backpressure: ' + ws.getBufferedAmount());
   },
   close: (ws, code, message) => {
-    console.log('WebSocket closed');
+    chatServer.closeConnection(ws)
+    console.log('WebSocket closed', code, message);
   }
 }).any('/*', (res, req) => {
-  res.end('Nothing to see here!');
+  res.end('<>');
 }).listen(port, (token) => {
   if (token) {
     console.log('Listening to port ' + port);
