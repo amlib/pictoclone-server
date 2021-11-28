@@ -1,14 +1,11 @@
 import { ChatRoom } from "./ChatRoom.js";
+import { generateUniqueId } from "./Utils.js";
+
 import {
   messageTypesStr, messageTypesInt,
   errorsStr, errorsInt,
   decodeMessage, nameSize, colorIndexSize
 } from './specs.js'
-const { randomInt } = await import('crypto');
-
-const generateUniqueId = function () {
-  return randomInt(0, 2**48 - 1) + randomInt(0, 2**4)
-}
 
 export class ChatServer {
   incomingMessageMap = new Map()
@@ -24,12 +21,14 @@ export class ChatServer {
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CONNECT_ROOM'), this.handleConnectRoom)
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE'), this.handleSendChatMessage)
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_LEAVE_ROOM'), this.handleLeaveRoom)
+
+    this.chatQueueFlusher()
   }
 
   addNewConnection (ws) {
     const uniqueId = generateUniqueId() // TODO check collision?
     ws.uniqueId = uniqueId
-    console.log('addNewConnection:', uniqueId);
+    global.debug && console.log('ChatServer.addNewConnection:', uniqueId);
 
     let response = {
       type: messageTypesStr.get('MSG_TYPE_NEW_CONNECTION_RESULT'),
@@ -41,10 +40,9 @@ export class ChatServer {
     return response
   }
 
-
   closeConnection (ws) {
     const currentRoom = this.uniqueIdRoomMap.get(ws.uniqueId)
-    console.log('closeConnection:', ws.uniqueId);
+    global.debug && console.log('ChatServer.closeConnection:', ws.uniqueId);
 
     if (currentRoom != null) {
       currentRoom.removeUser(ws.uniqueId)
@@ -53,6 +51,32 @@ export class ChatServer {
     this.uniqueIdSocketMap.delete(ws.uniqueId)
     this.uniqueIdRoomMap.delete(ws.uniqueId)
   }
+
+  async chatQueueFlusher () {
+    let roomFlushQueue
+    while (true) {
+      if (this.roomFlushQueue.size > 0) {
+        roomFlushQueue = this.roomFlushQueue
+        this.roomFlushQueue = new Set()
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      if (roomFlushQueue != null && roomFlushQueue.size > 0) {
+        this.flushChatQueue(roomFlushQueue)
+      }
+    }
+  }
+
+  flushChatQueue (roomFlushQueue) {
+     try {
+       for (let room of roomFlushQueue) {
+         // TODO check getBufferedAmount?
+         // TODO turn in promise, only do at most x rooms at a time, wait promises to resovle to keep going?
+         room.flushChatMessageQueueToRecipients(this.uniqueIdSocketMap)
+       }
+     } catch (e) {
+       global.debug && console.error('ChatServer.flushChatQueue error when flushing chat queue:', e)
+     }
+   }
 
   /* Incoming message handlers */
 
@@ -81,11 +105,11 @@ export class ChatServer {
 
     const callback = this.incomingMessageMap.get(message.type)
     if (callback != null) {
-      console.log('handleIncomingMessage:', messageTypesInt.get(message.type), message.uniqueId)
+      global.debug && console.log('ClientServer.handleIncomingMessage:', messageTypesInt.get(message.type), message.uniqueId, payload.byteLength)
       const newPayloadOffset = decodeMessage(message, payload, payloadOffset)
       response = callback.call(this, message)
     } else {
-      console.warn('handleIncomingMessage: unknown message type: ' + message.type)
+      global.debug && console.warn('handleIncomingMessage: unknown message type, ignoring: ' + message.type)
     }
 
     return response
@@ -127,7 +151,7 @@ export class ChatServer {
       return response
     }
 
-    if (!existingRoom.checkFreeSlot) {
+    if (!existingRoom.checkFreeSlot()) {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_ROOM_NO_FREE_SLOTS')
       response.errorMessage = 'Room ' + message.code + ' is full'
@@ -197,22 +221,12 @@ export class ChatServer {
       return response
     }
 
-    response.success = existingRoom.addMessage(message.uniqueId, message)
-    // add room to a map of to be flushed room message queues
-    // something will eventually actually flush all queues and get messages delivered...
-    this.roomFlushQueue.add(existingRoom)
-    if (this.queueFlushTimeout == null) {
-      this.queueFlushTimeout = setTimeout(() => {
-        try {
-          for (let room of this.roomFlushQueue) {
-            room.flushChatMessageQueueToRecipients(this.uniqueIdSocketMap)
-          }
-          this.queueFlushTimeout = undefined
-        } catch (e) {
-          console.log('ERROR when flushing chat queue:', e)
-        }
-      }, 1500)
+    existingRoom.addMessage(message.uniqueId, message, response)
+    if (!response.success) {
+      return response
     }
+
+    this.roomFlushQueue.add(existingRoom)
 
     return response
   }

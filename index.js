@@ -6,8 +6,9 @@ import {
   decodeMessageHeader, encodeMessage
 } from './src/specs.js'
 
-const chatServer = new ChatServer()
 const port = 9001
+global.debug = true
+const chatServer = new ChatServer()
 
 const app = uWS.App().ws('/*', {
   /* Options */
@@ -29,30 +30,30 @@ const app = uWS.App().ws('/*', {
         let ok = ws.send(encodeMessage(response), isBinary);
       }
     } catch (e) {
-      console.log('message: ERROR:', e) // TODO only on debug
+      global.debug && console.error('uWS.message: general error caught when processing a message:', e)
       const response = {
         type: messageTypesStr.get('MSG_TYPE_GENERIC_ERROR'),
         uniqueId: ws.uniqueId != null ? ws.uniqueId : 0,
         errorCode: errorsStr.get('ERROR_GENERIC_ERROR'),
-        errorMessage: e.toString() // TODO only on debug
+        errorMessage: debug ? e.toString() : 'Generic error'
       }
 
       let ok = ws.send(encodeMessage(response), isBinary);
     }
   },
   drain: (ws) => {
-    console.log('WebSocket backpressure: ' + ws.getBufferedAmount());
+    global.debug && console.log('uWS.drain WebSocket backpressure: ' + ws.getBufferedAmount());
   },
   close: (ws, code, message) => {
     chatServer.closeConnection(ws)
-    console.log('WebSocket closed', code, message);
+    // global.debug && console.log('uWS.close: WebSocket closed', code, message);
   }
 }).any('/*', (res, req) => {
   res.end('<>');
 }).listen(port, (token) => {
   if (token) {
-    console.log('Listening to port ' + port);
+    console.log('uWS.listen: Listening to port ' + port);
   } else {
-    console.log('Failed to listen to port ' + port);
+    console.log('uWS.listen: Failed to listen to port ' + port);
   }
 });
