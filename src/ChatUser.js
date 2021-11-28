@@ -1,9 +1,9 @@
 export class ChatUser {
   name
-  color
+  colorIndex
 
-  constructor(name, color) {
+  constructor(name, colorIndex) {
     this.name = name
-    this.color = color
+    this.colorIndex = colorIndex
   }
 }

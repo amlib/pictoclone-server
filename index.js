@@ -34,7 +34,7 @@ const app = uWS.App().ws('/*', {
         type: messageTypesStr.get('MSG_TYPE_GENERIC_ERROR'),
         uniqueId: ws.uniqueId != null ? ws.uniqueId : 0,
         errorCode: errorsStr.get('ERROR_GENERIC_ERROR'),
-        errorMessage: e.toString()
+        errorMessage: e.toString() // TODO only on debug
       }
 
       let ok = ws.send(encodeMessage(response), isBinary);

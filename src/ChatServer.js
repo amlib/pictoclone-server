@@ -2,16 +2,21 @@ import { ChatRoom } from "./ChatRoom.js";
 import {
   messageTypesStr, messageTypesInt,
   errorsStr, errorsInt,
-  decodeMessage
+  decodeMessage, nameSize, colorIndexSize
 } from './specs.js'
+const { randomInt } = await import('crypto');
+
+const generateUniqueId = function () {
+  return randomInt(0, 2**48 - 1) + randomInt(0, 2**4)
+}
 
 export class ChatServer {
   incomingMessageMap = new Map()
 
-  roomCodeMap = new Map() // 9999: Room()
-  uniqueIdRoomMap = new Map() // 1234: Room()
+  roomCodeMap = new Map() // 9999: ChatRoom()
+  uniqueIdRoomMap = new Map() // 1234: ChatRoom()
   uniqueIdSocketMap = new Map() // 1234: ws()
-  roomFlushQueue = new Set() // [Room(), Room(), ...]
+  roomFlushQueue = new Set() // [ChatRoom(), ChatRoom(), ...]
   queueFlushTimeout
 
   constructor () {
@@ -22,7 +27,7 @@ export class ChatServer {
   }
 
   addNewConnection (ws) {
-    const uniqueId = Math.round(Math.random() * 100000) // TODO use uuid
+    const uniqueId = generateUniqueId()
     ws.uniqueId = uniqueId
     console.log('addNewConnection:', uniqueId);
 
@@ -66,9 +71,7 @@ export class ChatServer {
       return response
     }
 
-    // TODO check if uniqueId _value_ is valid?
-
-    if (message.uniqueId !== ws.uniqueId) {
+    if (message.uniqueId < 0 || message.uniqueId !== ws.uniqueId) {
       response.type = messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
       response.errorCode = errorsStr.get('ERROR_INVALID_UNIQUE_ID')
@@ -116,8 +119,6 @@ export class ChatServer {
       uniqueId: message.uniqueId
     }
 
-    // TODO Check if username invalid (empty +)
-
     const existingRoom = this.roomCodeMap.get(message.code)
     if (existingRoom == null) {
       response.success = false
@@ -140,8 +141,22 @@ export class ChatServer {
       return response
     }
 
+    if (message.userName == null || message.length <= 0 || message === '' || message.userName.length > nameSize) {
+      response.success = false
+      response.errorCode = errorsStr.get('ERROR_INVALID_USER_NAME')
+      response.errorMessage = 'Invalid username'
+      return response
+    }
+
+    if (message.colorIndex == null || message.colorIndex < 0 || message.colorIndex > (colorIndexSize - 1)) {
+      response.success = false
+      response.errorCode = errorsStr.get('ERROR_INVALID_COLOR_INDEX')
+      response.errorMessage = 'Invalid color index'
+      return response
+    }
+
     this.uniqueIdRoomMap.set(message.uniqueId, existingRoom)
-    existingRoom.addUser(message.uniqueId, message.userName, '#F00')
+    existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex)
 
     response.success = true
     return response
@@ -181,10 +196,14 @@ export class ChatServer {
     this.roomFlushQueue.add(existingRoom)
     if (this.queueFlushTimeout == null) {
       this.queueFlushTimeout = setTimeout(() => {
-        for (let room of this.roomFlushQueue) {
-          room.flushChatMessageQueueToRecipients(this.uniqueIdSocketMap)
+        try {
+          for (let room of this.roomFlushQueue) {
+            room.flushChatMessageQueueToRecipients(this.uniqueIdSocketMap)
+          }
+          this.queueFlushTimeout = undefined
+        } catch (e) {
+          console.log('ERROR when flushing chat queue:', e)
         }
-        this.queueFlushTimeout = undefined
       }, 1500)
     }
 

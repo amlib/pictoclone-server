@@ -23,8 +23,8 @@ export class ChatRoom {
     return this.userNameUserMap.get(userName) == null
   }
 
-  addUser (uniqueId, userName, color) {
-    const user = new ChatUser(userName, color)
+  addUser (uniqueId, userName, colorIndex) {
+    const user = new ChatUser(userName, colorIndex)
     this.uniqueIdUserMap.set(uniqueId, user)
     this.userNameUserMap.set(userName, user)
   }
@@ -36,13 +36,14 @@ export class ChatRoom {
   }
 
   addMessage (uniqueId, message) {
-    // TODO Validate fields such as timestamp?
     const user =  this.uniqueIdUserMap.get(uniqueId)
+
     this.chatMessageQueue.push({
       uniqueId: uniqueId, // Make sure uniqueId is never given to other users along with the message!
       text: message.text,
-      timestamp: message.timestamp,
-      userName: user.name
+      timestamp: Date.now(), // ignoring received message timestamp...
+      userName: user.name,
+      colorIndex: user.colorIndex
     })
 
     return true
@@ -64,7 +65,8 @@ export class ChatRoom {
           processedChatMessages.push({
             text: message.text,
             timestamp: message.timestamp,
-            userName: message.userName
+            userName: message.userName,
+            colorIndex: message.colorIndex
           })
         }
       }
@@ -76,6 +78,7 @@ export class ChatRoom {
         }
         const response = {
           type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
+          uniqueId: ws.uniqueId,
           chatMessages: processedChatMessages
         }
 
