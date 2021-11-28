@@ -1,5 +1,8 @@
 import { ChatUser } from "./ChatUser.js";
-import { messageTypesStr, messageTypesInt, errorsStr, errorsInt } from './enums.js'
+import {
+  messageTypesStr, messageTypesInt,
+  errorsStr, errorsInt, encodeMessage
+} from './specs.js'
 
 export class ChatRoom {
   code
@@ -32,13 +35,13 @@ export class ChatRoom {
     this.uniqueIdUserMap.delete(uniqueId)
   }
 
-  addMessage (uniqueId, messagePayload) {
+  addMessage (uniqueId, message) {
     // TODO Validate fields such as timestamp?
     const user =  this.uniqueIdUserMap.get(uniqueId)
     this.chatMessageQueue.push({
       uniqueId: uniqueId, // Make sure uniqueId is never given to other users along with the message!
-      text: messagePayload.text,
-      timestamp: messagePayload.timestamp,
+      text: message.text,
+      timestamp: message.timestamp,
       userName: user.name
     })
 
@@ -67,12 +70,16 @@ export class ChatRoom {
       }
 
       if (processedChatMessages.length > 0) {
+        if (processedChatMessages.length > 255) {
+          console.error('flushChatMessageQueueToRecipients: too many messages! aborting!')
+          return
+        }
         const response = {
           type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
           chatMessages: processedChatMessages
         }
 
-        ws.send(JSON.stringify(response), false);
+        ws.send(encodeMessage(response), true)
       }
     }
   }

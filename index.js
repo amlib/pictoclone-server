@@ -1,10 +1,12 @@
 import uWS from 'uWebSockets.js'
 import { ChatServer } from './src/ChatServer.js'
-import { messageTypesStr, messageTypesInt, errorsStr, errorsInt } from './src/enums.js'
+import {
+  messageTypesStr,
+  errorsStr,
+  decodeMessageHeader, encodeMessage
+} from './src/specs.js'
 
 const chatServer = new ChatServer()
-const textDec = new TextDecoder("utf-8")
-const textEnc = new TextEncoder("utf-8")
 const port = 9001
 
 const app = uWS.App().ws('/*', {
@@ -15,25 +17,27 @@ const app = uWS.App().ws('/*', {
   /* Handlers */
   open: (ws) => {
     const response = chatServer.addNewConnection(ws)
-    let ok = ws.send(JSON.stringify(response), false);
+    let ok = ws.send(encodeMessage(response), true)
   },
   message: (ws, payload, isBinary) => {
-    const string = textDec.decode(new Uint8Array(payload))
     try {
-      const message = JSON.parse(string)
-      let response = chatServer.handleIncomingMessage(message, ws)
+      const { message, payloadOffset } = decodeMessageHeader(payload)
+      let response = chatServer.handleIncomingMessage(message, payload, payloadOffset, ws)
 
-      /* Ok is false if backpressure was built up, wait for drain */
       if (response != null) {
-        let ok = ws.send(JSON.stringify(response), isBinary);
+        // Ok is false if backpressure was built up, wait for drain
+        let ok = ws.send(encodeMessage(response), isBinary);
       }
     } catch (e) {
+      console.log('message: ERROR:', e.toString())
       const response = {
-        type: messageTypesStr.get('genericErrorResult'),
+        type: messageTypesStr.get('MSG_TYPE_GENERIC_ERROR'),
+        uniqueId: ws.uniqueId != null ? ws.uniqueId : 0,
         errorCode: errorsStr.get('ERROR_GENERIC_ERROR'),
-        errorMessage: e
+        errorMessage: e.toString()
       }
-      let ok = ws.send(JSON.stringify(response), isBinary);
+
+      let ok = ws.send(encodeMessage(response), isBinary);
       throw e
     }
   },

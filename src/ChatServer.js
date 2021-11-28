@@ -1,5 +1,9 @@
 import { ChatRoom } from "./ChatRoom.js";
-import { messageTypesStr, messageTypesInt, errorsStr, errorsInt } from './enums.js'
+import {
+  messageTypesStr, messageTypesInt,
+  errorsStr, errorsInt,
+  decodeMessage
+} from './specs.js'
 
 export class ChatServer {
   incomingMessageMap = new Map()
@@ -47,7 +51,7 @@ export class ChatServer {
 
   /* Incoming message handlers */
 
-  handleIncomingMessage (message, ws) {
+  handleIncomingMessage (message, payload, payloadOffset, ws) {
     let response = {}
 
     if (message.type == null) {
@@ -65,7 +69,7 @@ export class ChatServer {
     // TODO check if uniqueId _value_ is valid?
 
     if (message.uniqueId !== ws.uniqueId) {
-      response.type =messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
+      response.type = messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
       response.errorCode = errorsStr.get('ERROR_INVALID_UNIQUE_ID')
       response.errorMessage = ''
@@ -75,6 +79,7 @@ export class ChatServer {
     const callback = this.incomingMessageMap.get(message.type)
     if (callback != null) {
       console.log('handleIncomingMessage:', messageTypesInt.get(message.type), message.uniqueId)
+      const newPayloadOffset = decodeMessage(message, payload, payloadOffset)
       response = callback.call(this, message)
     } else {
       console.warn('handleIncomingMessage: unknown message type: ' + message.type)
@@ -86,7 +91,7 @@ export class ChatServer {
   handleCreateRoom (message) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CREATE_ROOM_RESULT'),
-      code: message.code,
+      uniqueId: message.uniqueId
     }
 
     const existingRoom = this.roomCodeMap.get(message.code)
@@ -108,10 +113,10 @@ export class ChatServer {
   handleConnectRoom (message) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CONNECT_ROOM_RESULT'),
-      code: message.code,
+      uniqueId: message.uniqueId
     }
 
-    // Check if username invalid (empty +)
+    // TODO Check if username invalid (empty +)
 
     const existingRoom = this.roomCodeMap.get(message.code)
     if (existingRoom == null) {
@@ -144,7 +149,8 @@ export class ChatServer {
 
   handleLeaveRoom (message) {
     const response = {
-      type: messageTypesStr.get('MSG_TYPE_LEAVE_ROOM_RESULT')
+      type: messageTypesStr.get('MSG_TYPE_LEAVE_ROOM_RESULT'),
+      uniqueId: message.uniqueId
     }
 
     const currentRoom = this.uniqueIdRoomMap.get(message.uniqueId)
@@ -154,7 +160,7 @@ export class ChatServer {
     } else {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_ROOM_NOT_IN_ANY_ROOM')
-      response.errorMessage = 'User ' + message.userName + ' not in any room'
+      response.errorMessage = 'UniqueId ' + message.uniqueId + ' not in any room'
       return response
     }
 
@@ -164,11 +170,12 @@ export class ChatServer {
 
   handleSendChatMessage (message) {
     const response = {
-      type: messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE_RESULT')
+      type: messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE_RESULT'),
+      uniqueId: message.uniqueId
     }
 
     const existingRoom = this.uniqueIdRoomMap.get(message.uniqueId)
-    response.success = existingRoom.addMessage(message.uniqueId, message.messagePayload)
+    response.success = existingRoom.addMessage(message.uniqueId, message)
     // add room to a map of to be flushed room message queues
     // something will eventually actually flush all queues and get messages delivered...
     this.roomFlushQueue.add(existingRoom)
