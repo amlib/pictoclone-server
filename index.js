@@ -29,7 +29,7 @@ const app = uWS.App().ws('/*', {
         let ok = ws.send(encodeMessage(response), isBinary);
       }
     } catch (e) {
-      console.log('message: ERROR:', e.toString())
+      console.log('message: ERROR:', e) // TODO only on debug
       const response = {
         type: messageTypesStr.get('MSG_TYPE_GENERIC_ERROR'),
         uniqueId: ws.uniqueId != null ? ws.uniqueId : 0,
@@ -38,7 +38,6 @@ const app = uWS.App().ws('/*', {
       }
 
       let ok = ws.send(encodeMessage(response), isBinary);
-      throw e
     }
   },
   drain: (ws) => {

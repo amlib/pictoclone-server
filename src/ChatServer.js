@@ -27,7 +27,7 @@ export class ChatServer {
   }
 
   addNewConnection (ws) {
-    const uniqueId = generateUniqueId()
+    const uniqueId = generateUniqueId() // TODO check collision?
     ws.uniqueId = uniqueId
     console.log('addNewConnection:', uniqueId);
 
@@ -190,6 +190,13 @@ export class ChatServer {
     }
 
     const existingRoom = this.uniqueIdRoomMap.get(message.uniqueId)
+    if (existingRoom == null) {
+      response.success = false
+      response.errorCode = errorsStr.get('ERROR_ROOM_DOES_NOT_EXISTS')
+      response.errorMessage = 'Your uniqueId is not associated with any room'
+      return response
+    }
+
     response.success = existingRoom.addMessage(message.uniqueId, message)
     // add room to a map of to be flushed room message queues
     // something will eventually actually flush all queues and get messages delivered...

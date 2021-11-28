@@ -38,9 +38,12 @@ export class ChatRoom {
   addMessage (uniqueId, message) {
     const user =  this.uniqueIdUserMap.get(uniqueId)
 
+    // TODO check image and texts size?
+    // TODO return payload if error
     this.chatMessageQueue.push({
       uniqueId: uniqueId, // Make sure uniqueId is never given to other users along with the message!
       text: message.text,
+      image: message.image,
       timestamp: Date.now(), // ignoring received message timestamp...
       userName: user.name,
       colorIndex: user.colorIndex
@@ -64,6 +67,7 @@ export class ChatRoom {
         if (uniqueId !== message.uniqueId) {
           processedChatMessages.push({
             text: message.text,
+            image: message.image,
             timestamp: message.timestamp,
             userName: message.userName,
             colorIndex: message.colorIndex
