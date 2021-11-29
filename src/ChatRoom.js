@@ -1,4 +1,3 @@
-import { ChatUser } from "./ChatUser.js";
 import { getPngDimensions } from "./Utils.js";
 import { messageHeight, messageWidth } from "./Message.js";
 
@@ -13,43 +12,46 @@ export class ChatRoom {
   code
   open
   maxSlots = 16
+  topPublicId
 
-  uniqueIdUserMap = new Map() // 1234: ChatUser()
-  userNameUniqueIdMap = new Map() // foobar: 1234
+  userNameUserSocketMap = new Map() // foobar: ws()
+  attachedUsersSockets = new Set() // ws() ws() ...
   chatMessageQueue = [] // [ {...}, {...}, ...]
 
   constructor(code) {
     this.code = code
     this.open = true
+    this.topPublicId = 0
   }
 
   checkFreeSlot () {
-    return this.uniqueIdUserMap.size < this.maxSlots
+    return this.attachedUsersSockets.size < this.maxSlots
   }
 
   checkFreeUserName (userName) {
-    return this.userNameUniqueIdMap.get(userName) == null
+    return this.userNameUserSocketMap.get(userName) == null
   }
 
   isEmpty () {
-    return this.uniqueIdUserMap.size <= 0
+    return this.attachedUsersSockets.size <= 0
   }
 
-  addUser (uniqueId, userName, colorIndex) {
-    const user = new ChatUser(userName, colorIndex)
-    this.uniqueIdUserMap.set(uniqueId, user)
-    this.userNameUniqueIdMap.set(userName, uniqueId)
+  addUser (uniqueId, userName, colorIndex, ws) {
+    this.topPublicId += 1
+    this.userNameUserSocketMap.set(userName, ws)
+    this.attachedUsersSockets.add(ws)
+
+    ws.publicId = this.topPublicId
+    ws.userName = userName
+    ws.colorIndex = colorIndex
   }
 
-  removeUser (uniqueId) {
-    const user = this.uniqueIdUserMap.get(uniqueId)
-    this.userNameUniqueIdMap.delete(user.name)
-    this.uniqueIdUserMap.delete(uniqueId)
+  removeUser (ws) {
+    this.userNameUserSocketMap.delete(ws.userName)
+    this.attachedUsersSockets.delete(ws)
   }
 
-  addMessage (uniqueId, message, response) {
-    const user =  this.uniqueIdUserMap.get(uniqueId)
-
+  addMessage (message, response, ws) {
     const dimensions = getPngDimensions(message.image)
     if (dimensions == null ||
       dimensions.length > messageWidth || dimensions.height > messageHeight ||
@@ -61,44 +63,35 @@ export class ChatRoom {
     }
 
     this.chatMessageQueue.push({
-      uniqueId: uniqueId, // Make sure uniqueId is never given to other users along with the message!
+      publicId: ws.publicId,
       text: message.text, // TODO check texts size?
       image: message.image,
       timestamp: Date.now(), // ignoring received message timestamp...
-      userName: user.name,
-      colorIndex: user.colorIndex
+      userName: ws.userName,
+      colorIndex: ws.colorIndex
     })
 
     response.success = true
   }
 
-  flushChatMessageQueueToRecipients (uniqueIdSocketMap) {
+  flushChatMessageQueueToRecipients () {
     if (!this.open || this.chatMessageQueue == null || this.chatMessageQueue.length <= 0) {
       return
     }
 
     const chatMessageQueue = this.chatMessageQueue
     this.chatMessageQueue = []
-    // for (let i = 0; i < chatMessageQueue.length; ++i) {
-    //   const message = chatMessageQueue[i]
-    // }
 
-    for (let [uniqueId, user] of this.uniqueIdUserMap) {
-      const ws = uniqueIdSocketMap.get(uniqueId)
+    for (let ws of this.attachedUsersSockets) {
       if (ws == null) {
         continue
       }
+
       const processedChatMessages = []
       for (let i = 0; i < chatMessageQueue.length; ++i) {
         const message = chatMessageQueue[i]
-        if (uniqueId !== message.uniqueId) {
-          processedChatMessages.push({
-            text: message.text,
-            image: message.image,
-            timestamp: message.timestamp,
-            userName: message.userName,
-            colorIndex: message.colorIndex
-          })
+        if (ws.publicId !== message.publicId) {
+          processedChatMessages.push(message)
         }
       }
 
@@ -113,7 +106,7 @@ export class ChatRoom {
           chatMessages: processedChatMessages
         }
 
-        global.debug && console.log(`ChatRoom.flushChatMessageQueueToRecipients: dispatching from room ${this.code} to ${user.name} (${ws.uniqueId})`)
+        global.debug && console.log(`ChatRoom.flushChatMessageQueueToRecipients: dispatching from room ${this.code} to ${ws.userName} (${ws.uniqueId})`)
         ws.send(encodeMessage(response), true)
       }
     }

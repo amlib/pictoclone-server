@@ -393,6 +393,7 @@ const messageTypesEncoder = Object.freeze(new Map([
       const chatMessage = message.chatMessages[i]
       const chatMessageSize = chatMessageSizes[i]
       let view = new DataView(payload, currentArrayOffset)
+      // TODO encode publicId ? if so also add to decoder!
       view.setUint32(0, chatMessageSize)
       view.setBigInt64(4, BigInt(chatMessage.timestamp))
       view.setUint8(12, chatMessage.colorIndex)

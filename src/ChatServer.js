@@ -47,14 +47,16 @@ export class ChatServer {
     global.debug && console.log('ChatServer.closeConnection:', ws.uniqueId);
 
     if (currentRoom != null) {
-      this.removeUserFromRoom(currentRoom, ws.uniqueId)
+      this.removeUserFromRoom(currentRoom, ws)
     }
 
     this.uniqueIdSocketMap.delete(ws.uniqueId)
   }
 
-  removeUserFromRoom (room, uniqueId) {
-    room.removeUser(uniqueId)
+  removeUserFromRoom (room, ws) {
+    room.removeUser(ws)
+    ws.room = null
+    ws.publicId = null
     if (room.isEmpty) {
       this.closeRoom(room)
     }
@@ -98,7 +100,7 @@ export class ChatServer {
        for (let room of roomFlushQueue) {
          // TODO check getBufferedAmount?
          // TODO turn in promise, only do at most x rooms at a time, wait promises to resovle to keep going?
-         room.flushChatMessageQueueToRecipients(this.uniqueIdSocketMap)
+         room.flushChatMessageQueueToRecipients()
        }
      } catch (e) {
        global.debug && console.error('ChatServer.flushChatQueue error when flushing chat queue:', e)
@@ -205,8 +207,9 @@ export class ChatServer {
     }
 
     ws.room = existingRoom
-    existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex)
+    existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex, ws)
 
+    // TODO send publicId back?
     response.success = true
     return response
   }
@@ -246,7 +249,7 @@ export class ChatServer {
       return response
     }
 
-    existingRoom.addMessage(message.uniqueId, message, response)
+    existingRoom.addMessage(message, response, ws)
     if (!response.success) {
       return response
     }
