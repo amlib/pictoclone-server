@@ -77,41 +77,45 @@ export class ChatRoom {
       colorIndex: ws.colorIndex
     })
 
+    this.flushChatMessageQueueToRecipients()
+
     response.success = true
   }
 
   flushChatMessageQueueToRecipients () {
-    if (!this.open || this.chatMessageQueue == null || this.chatMessageQueue.length <= 0) {
-      return
-    }
-
-    const chatMessageQueue = this.chatMessageQueue
-    this.chatMessageQueue = []
-
-    for (let ws of this.attachedUsersSockets) {
-
-      const processedChatMessages = []
-      for (let i = 0; i < chatMessageQueue.length; ++i) {
-        const message = chatMessageQueue[i]
-        if (ws.publicId !== message.publicId) {
-          processedChatMessages.push(message)
-        }
+    return new Promise ((resolve) => {
+      if (!this.open || this.chatMessageQueue == null || this.chatMessageQueue.length <= 0) {
+        return
       }
 
-      if (processedChatMessages.length > 0) {
-        if (processedChatMessages.length > 255) {
-          global.debug && console.warn('ChatRoom.flushChatMessageQueueToRecipients: too many messages! aborting!')
-          continue
-        }
-        const response = {
-          type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
-          uniqueId: ws.uniqueId,
-          chatMessages: processedChatMessages
+      const chatMessageQueue = this.chatMessageQueue
+      this.chatMessageQueue = []
+
+      for (let ws of this.attachedUsersSockets) {
+
+        const processedChatMessages = []
+        for (let i = 0; i < chatMessageQueue.length; ++i) {
+          const message = chatMessageQueue[i]
+          if (ws.publicId !== message.publicId) {
+            processedChatMessages.push(message)
+          }
         }
 
-        global.debug && console.log(`ChatRoom.flushChatMessageQueueToRecipients: dispatching from room ${this.code} to ${ws.userName} (${ws.uniqueId})`)
-        ws.send(encodeMessage(response), true)
+        if (processedChatMessages.length > 0) {
+          if (processedChatMessages.length > 255) {
+            global.debug && console.warn('ChatRoom.flushChatMessageQueueToRecipients: too many messages! aborting!')
+            continue
+          }
+          const response = {
+            type: messageTypesStr.get('MSG_TYPE_RECEIVE_CHAT_MESSAGES'),
+            uniqueId: ws.uniqueId,
+            chatMessages: processedChatMessages
+          }
+
+          global.debug && console.log(`ChatRoom.flushChatMessageQueueToRecipients: dispatching from room ${this.code} to ${ws.userName} (${ws.uniqueId})`)
+          ws.send(encodeMessage(response), true)
+        }
       }
-    }
+    })
   }
 }

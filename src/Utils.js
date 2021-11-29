@@ -32,4 +32,12 @@ const generateUniqueId = function () {
   return randomInt(0, e48 - 1) + randomInt(0, e4)
 }
 
+function busyLoop(time, callback) {
+  let stop = performance.now();
+  while(performance.now() < stop + time) {
+    ;
+  }
+  callback();
+}
+
 export { getPngDimensions, generateUniqueId }

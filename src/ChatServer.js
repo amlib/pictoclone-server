@@ -21,7 +21,8 @@ export class ChatServer {
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE'), this.handleSendChatMessage)
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_LEAVE_ROOM'), this.handleLeaveRoom)
 
-    this.chatQueueFlusher() // TODO add way to stop it
+    // TODO chatQueueFlusher needs to be threaded before its any use...
+    // this.chatQueueFlusher() // TODO add way to stop it
   }
 
   addNewConnection (ws) {
@@ -101,11 +102,9 @@ export class ChatServer {
     }
   }
 
-  flushChatQueue (roomFlushQueue) {
+  async flushChatQueue (roomFlushQueue) {
      try {
        for (let room of roomFlushQueue) {
-         // TODO check getBufferedAmount?
-         // TODO turn in promise, only do at most x rooms at a time, wait promises to resovle to keep going?
          room.flushChatMessageQueueToRecipients()
        }
      } catch (e) {
