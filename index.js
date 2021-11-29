@@ -46,7 +46,6 @@ const app = uWS.App().ws('/*', {
   },
   close: (ws, code, message) => {
     chatServer.closeConnection(ws)
-    // global.debug && console.log('uWS.close: WebSocket closed', code, message);
   }
 }).any('/*', (res, req) => {
   res.end('<>');

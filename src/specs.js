@@ -1,3 +1,4 @@
+const textDec = new TextDecoder('utf-8')
 const textEnc = new TextEncoder('utf-8')
 
 // each value in key value pair must be unique!
