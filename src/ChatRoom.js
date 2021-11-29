@@ -29,7 +29,7 @@ export class ChatRoom {
   }
 
   checkFreeUserName (userName) {
-    return this.userNameUserSocketMap.get(userName) == null
+    return !this.userNameUserSocketMap.has(userName)
   }
 
   isEmpty () {
@@ -41,6 +41,7 @@ export class ChatRoom {
     this.userNameUserSocketMap.set(userName, ws)
     this.attachedUsersSockets.add(ws)
 
+    ws.room = this
     ws.publicId = this.topPublicId
     ws.userName = userName
     ws.colorIndex = colorIndex
@@ -49,6 +50,11 @@ export class ChatRoom {
   removeUser (ws) {
     this.userNameUserSocketMap.delete(ws.userName)
     this.attachedUsersSockets.delete(ws)
+
+    ws.room = null
+    ws.publicId = null
+    ws.userName = null
+    ws.colorIndex = null
   }
 
   addMessage (message, response, ws) {
@@ -83,9 +89,6 @@ export class ChatRoom {
     this.chatMessageQueue = []
 
     for (let ws of this.attachedUsersSockets) {
-      if (ws == null) {
-        continue
-      }
 
       const processedChatMessages = []
       for (let i = 0; i < chatMessageQueue.length; ++i) {

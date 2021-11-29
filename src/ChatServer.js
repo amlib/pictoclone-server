@@ -55,14 +55,20 @@ export class ChatServer {
 
   removeUserFromRoom (room, ws) {
     room.removeUser(ws)
-    ws.room = null
-    ws.publicId = null
-    if (room.isEmpty) {
+    if (room.isEmpty()) {
       this.closeRoom(room)
     }
   }
 
+  openRoom (code) {
+    global.debug && console.log('ChatServer.openRoom:', code);
+    const room = new ChatRoom(code)
+    this.roomCodeMap.set(room.code, room)
+    return room
+  }
+
   closeRoom (room) {
+    global.debug && console.log('ChatServer.closeRoom:', room.code);
     room.open = false
     this.roomCodeMap.delete(room.code)
   }
@@ -174,8 +180,7 @@ export class ChatServer {
 
     let existingRoom = this.roomCodeMap.get(message.code)
     if (existingRoom == null) {
-      existingRoom = new ChatRoom(message.code)
-      this.roomCodeMap.set(existingRoom.code, existingRoom)
+      existingRoom = this.openRoom(message.code)
     }
 
     if (!existingRoom.checkFreeSlot()) {
@@ -206,7 +211,6 @@ export class ChatServer {
       return response
     }
 
-    ws.room = existingRoom
     existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex, ws)
 
     // TODO send publicId back?
@@ -223,7 +227,7 @@ export class ChatServer {
     const currentRoom = ws.room
 
     if (currentRoom != null) {
-      this.removeUserFromRoom(currentRoom, message.uniqueId)
+      this.removeUserFromRoom(currentRoom, ws)
     } else {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_ROOM_NOT_IN_ANY_ROOM')
