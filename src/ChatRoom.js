@@ -13,9 +13,11 @@ export class ChatRoom {
   uniqueIdUserMap = new Map() // 1234: ChatUser()
   userNameUserMap = new Map() // foobar: ChatUser()
   chatMessageQueue = [] // [ {...}, {...}, ...]
+  open
 
   constructor(code) {
     this.code = code
+    this.open = true
   }
 
   checkFreeSlot () {
@@ -24,6 +26,10 @@ export class ChatRoom {
 
   checkFreeUserName (userName) {
     return this.userNameUserMap.get(userName) == null
+  }
+
+  isEmpty () {
+    return this.userNameUserMap.size <= 0
   }
 
   addUser (uniqueId, userName, colorIndex) {
@@ -62,6 +68,10 @@ export class ChatRoom {
   }
 
   flushChatMessageQueueToRecipients (uniqueIdSocketMap) {
+    if (!this.open || this.chatMessageQueue == null || this.chatMessageQueue.length <= 0) {
+      return
+    }
+
     const chatMessageQueue = this.chatMessageQueue
     this.chatMessageQueue = []
     // for (let i = 0; i < chatMessageQueue.length; ++i) {
@@ -99,7 +109,6 @@ export class ChatRoom {
         }
 
         global.debug && console.log(`ChatRoom.flushChatMessageQueueToRecipients: dispatching from room ${this.code} to ${user.name} (${ws.uniqueId})`)
-
         ws.send(encodeMessage(response), true)
       }
     }

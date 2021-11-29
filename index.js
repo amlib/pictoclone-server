@@ -12,7 +12,7 @@ const chatServer = new ChatServer()
 
 const app = uWS.App().ws('/*', {
   /* Options */
-  compression: uWS.SHARED_COMPRESSOR,
+  compression: uWS.DISABLED,
   maxPayloadLength: 32 * 1024, // bytes
   idleTimeout: 32,
   /* Handlers */

@@ -9,12 +9,12 @@ import {
 
 export class ChatServer {
   incomingMessageMap = new Map()
+  flusherPeriod = 1000
 
   roomCodeMap = new Map() // 9999: ChatRoom()
   uniqueIdRoomMap = new Map() // 1234: ChatRoom()
   uniqueIdSocketMap = new Map() // 1234: ws()
   roomFlushQueue = new Set() // [ChatRoom(), ChatRoom(), ...]
-  queueFlushTimeout
 
   constructor () {
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_CREATE_ROOM'), this.handleCreateRoom)
@@ -22,7 +22,7 @@ export class ChatServer {
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE'), this.handleSendChatMessage)
     this.incomingMessageMap.set(messageTypesStr.get('MSG_TYPE_LEAVE_ROOM'), this.handleLeaveRoom)
 
-    this.chatQueueFlusher()
+    this.chatQueueFlusher() // TODO add way to stop it
   }
 
   addNewConnection (ws) {
@@ -45,23 +45,49 @@ export class ChatServer {
     global.debug && console.log('ChatServer.closeConnection:', ws.uniqueId);
 
     if (currentRoom != null) {
-      currentRoom.removeUser(ws.uniqueId)
+      this.removeUserFromRoom(currentRoom, ws.uniqueId)
     }
 
     this.uniqueIdSocketMap.delete(ws.uniqueId)
     this.uniqueIdRoomMap.delete(ws.uniqueId)
   }
 
+  removeUserFromRoom (room, uniqueId) {
+    room.removeUser(uniqueId)
+    if (room.isEmpty) {
+      this.closeRoom(room)
+    }
+  }
+
+  closeRoom (room) {
+    room.open = false
+    this.roomCodeMap.delete(room.code)
+  }
+
+  /* Chat queue */
+
   async chatQueueFlusher () {
     let roomFlushQueue
+    let timeStamp = 0, previousTimestamp = 0
+
     while (true) {
+      previousTimestamp = timeStamp
+      timeStamp = performance.now()
+      const timeStampDelta = timeStamp - previousTimestamp
+      const overheadTime = timeStampDelta - this.flusherPeriod
+
       if (this.roomFlushQueue.size > 0) {
         roomFlushQueue = this.roomFlushQueue
         this.roomFlushQueue = new Set()
       }
-      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      const period = Math.min(Math.max(this.flusherPeriod - overheadTime , 10), this.flusherPeriod)
+      // console.log({ timeStampDelta, overheadTime, period })
+      await new Promise(resolve => setTimeout(resolve, period))
+
       if (roomFlushQueue != null && roomFlushQueue.size > 0) {
         this.flushChatQueue(roomFlushQueue)
+        roomFlushQueue = null
       }
     }
   }
@@ -115,23 +141,24 @@ export class ChatServer {
     return response
   }
 
+  /* deprecated */
   handleCreateRoom (message) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CREATE_ROOM_RESULT'),
       uniqueId: message.uniqueId
     }
 
-    const existingRoom = this.roomCodeMap.get(message.code)
-    if (existingRoom != null) {
-      response.success = false
-      response.errorCode = errorsStr.get('ERROR_ROOM_ALREADY_EXISTS')
-      response.errorMessage = 'Room ' + message.code + ' already exists'
-      return response
-    }
+    // const existingRoom = this.roomCodeMap.get(message.code)
+    // if (existingRoom != null) {
+    //   response.success = false
+    //   response.errorCode = errorsStr.get('ERROR_ROOM_ALREADY_EXISTS')
+    //   response.errorMessage = 'Room ' + message.code + ' already exists'
+    //   return response
+    // }
 
-    const chatRoom = new ChatRoom(message.code)
-
-    this.roomCodeMap.set(chatRoom.code, chatRoom)
+    // const chatRoom = new ChatRoom(message.code)
+    //
+    // this.roomCodeMap.set(chatRoom.code, chatRoom)
 
     response.success = true
     return response
@@ -143,12 +170,10 @@ export class ChatServer {
       uniqueId: message.uniqueId
     }
 
-    const existingRoom = this.roomCodeMap.get(message.code)
+    let existingRoom = this.roomCodeMap.get(message.code)
     if (existingRoom == null) {
-      response.success = false
-      response.errorCode = errorsStr.get('ERROR_ROOM_DOES_NOT_EXISTS')
-      response.errorMessage = 'Room ' + message.code + ' does not exists'
-      return response
+      existingRoom = new ChatRoom(message.code)
+      this.roomCodeMap.set(existingRoom.code, existingRoom)
     }
 
     if (!existingRoom.checkFreeSlot()) {
@@ -195,7 +220,7 @@ export class ChatServer {
     const currentRoom = this.uniqueIdRoomMap.get(message.uniqueId)
 
     if (currentRoom != null) {
-      currentRoom.removeUser(message.uniqueId)
+      this.removeUserFromRoom(currentRoom, message.uniqueId)
     } else {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_ROOM_NOT_IN_ANY_ROOM')
@@ -214,7 +239,7 @@ export class ChatServer {
     }
 
     const existingRoom = this.uniqueIdRoomMap.get(message.uniqueId)
-    if (existingRoom == null) {
+    if (existingRoom == null || !existingRoom.open) {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_ROOM_DOES_NOT_EXISTS')
       response.errorMessage = 'Your uniqueId is not associated with any room'
