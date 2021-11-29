@@ -3,17 +3,20 @@ import { getPngDimensions } from "./Utils.js";
 import { messageHeight, messageWidth } from "./Message.js";
 
 import {
-  messageTypesStr, messageTypesInt,
-  errorsStr, errorsInt, encodeMessage
+  messageTypesStr,
+  errorsStr,
+  maxImageSize,
+  encodeMessage
 } from './specs.js'
 
 export class ChatRoom {
   code
-  maxSlots = 16
-  uniqueIdUserMap = new Map() // 1234: ChatUser()
-  userNameUserMap = new Map() // foobar: ChatUser()
-  chatMessageQueue = [] // [ {...}, {...}, ...]
   open
+  maxSlots = 16
+
+  uniqueIdUserMap = new Map() // 1234: ChatUser()
+  userNameUniqueIdMap = new Map() // foobar: 1234
+  chatMessageQueue = [] // [ {...}, {...}, ...]
 
   constructor(code) {
     this.code = code
@@ -25,22 +28,22 @@ export class ChatRoom {
   }
 
   checkFreeUserName (userName) {
-    return this.userNameUserMap.get(userName) == null
+    return this.userNameUniqueIdMap.get(userName) == null
   }
 
   isEmpty () {
-    return this.userNameUserMap.size <= 0
+    return this.uniqueIdUserMap.size <= 0
   }
 
   addUser (uniqueId, userName, colorIndex) {
     const user = new ChatUser(userName, colorIndex)
     this.uniqueIdUserMap.set(uniqueId, user)
-    this.userNameUserMap.set(userName, user)
+    this.userNameUniqueIdMap.set(userName, uniqueId)
   }
 
   removeUser (uniqueId) {
     const user = this.uniqueIdUserMap.get(uniqueId)
-    this.userNameUserMap.delete(user.name)
+    this.userNameUniqueIdMap.delete(user.name)
     this.uniqueIdUserMap.delete(uniqueId)
   }
 
@@ -48,7 +51,9 @@ export class ChatRoom {
     const user =  this.uniqueIdUserMap.get(uniqueId)
 
     const dimensions = getPngDimensions(message.image)
-    if (dimensions == null || dimensions.length > messageWidth || dimensions.height > messageHeight) {
+    if (dimensions == null ||
+      dimensions.length > messageWidth || dimensions.height > messageHeight ||
+      message.image.byteLength > maxImageSize) {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_CHAT_MESSAGE_INVALID_IMAGE')
       response.errorMessage = 'Invalid image'

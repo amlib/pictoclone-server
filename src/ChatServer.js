@@ -3,8 +3,8 @@ import { generateUniqueId } from "./Utils.js";
 
 import {
   messageTypesStr, messageTypesInt,
-  errorsStr, errorsInt,
-  decodeMessage, nameSize, colorIndexSize
+  errorsStr,
+  decodeMessage, nameSize, colorIndexSize, maxIncomingPayloadSize
 } from './specs.js'
 
 export class ChatServer {
@@ -12,7 +12,6 @@ export class ChatServer {
   flusherPeriod = 1000
 
   roomCodeMap = new Map() // 9999: ChatRoom()
-  uniqueIdRoomMap = new Map() // 1234: ChatRoom()
   uniqueIdSocketMap = new Map() // 1234: ws()
   roomFlushQueue = new Set() // [ChatRoom(), ChatRoom(), ...]
 
@@ -26,22 +25,25 @@ export class ChatServer {
   }
 
   addNewConnection (ws) {
-    const uniqueId = generateUniqueId() // TODO check collision?
+    let uniqueId
+    do {
+      uniqueId = generateUniqueId()
+    } while (this.uniqueIdSocketMap.get(uniqueId) != null)
+
     ws.uniqueId = uniqueId
+    this.uniqueIdSocketMap.set(uniqueId, ws)
+
     global.debug && console.log('ChatServer.addNewConnection:', uniqueId);
 
     let response = {
       type: messageTypesStr.get('MSG_TYPE_NEW_CONNECTION_RESULT'),
       uniqueId: uniqueId
     }
-
-    this.uniqueIdSocketMap.set(uniqueId, ws)
-
     return response
   }
 
   closeConnection (ws) {
-    const currentRoom = this.uniqueIdRoomMap.get(ws.uniqueId)
+    const currentRoom = ws.room
     global.debug && console.log('ChatServer.closeConnection:', ws.uniqueId);
 
     if (currentRoom != null) {
@@ -49,7 +51,6 @@ export class ChatServer {
     }
 
     this.uniqueIdSocketMap.delete(ws.uniqueId)
-    this.uniqueIdRoomMap.delete(ws.uniqueId)
   }
 
   removeUserFromRoom (room, uniqueId) {
@@ -107,12 +108,11 @@ export class ChatServer {
   /* Incoming message handlers */
 
   handleIncomingMessage (message, payload, payloadOffset, ws) {
-    let response = {}
-
-    if (message.type == null) {
+    if (message.type == null || payload.byteLength > maxIncomingPayloadSize.get(message.type)) {
       return null
     }
 
+    let response = {}
     if (message.uniqueId == null) {
       response.type = messageTypesStr.get(messageTypesInt.get(message.type) + '_RESULT')
       response.success = false
@@ -133,7 +133,7 @@ export class ChatServer {
     if (callback != null) {
       global.debug && console.log('ClientServer.handleIncomingMessage:', messageTypesInt.get(message.type), message.uniqueId, payload.byteLength)
       const newPayloadOffset = decodeMessage(message, payload, payloadOffset)
-      response = callback.call(this, message)
+      response = callback.call(this, message, ws)
     } else {
       global.debug && console.warn('handleIncomingMessage: unknown message type, ignoring: ' + message.type)
     }
@@ -164,7 +164,7 @@ export class ChatServer {
     return response
   }
 
-  handleConnectRoom (message) {
+  handleConnectRoom (message, ws) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CONNECT_ROOM_RESULT'),
       uniqueId: message.uniqueId
@@ -204,20 +204,20 @@ export class ChatServer {
       return response
     }
 
-    this.uniqueIdRoomMap.set(message.uniqueId, existingRoom)
+    ws.room = existingRoom
     existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex)
 
     response.success = true
     return response
   }
 
-  handleLeaveRoom (message) {
+  handleLeaveRoom (message, ws) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_LEAVE_ROOM_RESULT'),
       uniqueId: message.uniqueId
     }
 
-    const currentRoom = this.uniqueIdRoomMap.get(message.uniqueId)
+    const currentRoom = ws.room
 
     if (currentRoom != null) {
       this.removeUserFromRoom(currentRoom, message.uniqueId)
@@ -232,13 +232,13 @@ export class ChatServer {
     return response
   }
 
-  handleSendChatMessage (message) {
+  handleSendChatMessage (message, ws) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_SEND_CHAT_MESSAGE_RESULT'),
       uniqueId: message.uniqueId
     }
 
-    const existingRoom = this.uniqueIdRoomMap.get(message.uniqueId)
+    const existingRoom = ws.room
     if (existingRoom == null || !existingRoom.open) {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_ROOM_DOES_NOT_EXISTS')

@@ -26,8 +26,10 @@ const getPngDimensions = function (uint8png) {
   }
 }
 
+const e48 = 2**48
+const e4 = 2**4
 const generateUniqueId = function () {
-  return randomInt(0, 2**48 - 1) + randomInt(0, 2**4)
+  return randomInt(0, e48 - 1) + randomInt(0, e4)
 }
 
 export { getPngDimensions, generateUniqueId }
