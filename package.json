@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "debug": "node --inspect index.js"
+    "dev": "PICTOCLONE_SERVER_CONFIG_NAME=development node --inspect index.js"
   },
   "dependencies": {
     "uWebSockets.js": "uNetworking/uWebSockets.js#v20.4.0",

@@ -7,13 +7,14 @@ A server for the pictoclone chat app made in Node.js and uWebSockets.js
 yarn
 ```
 
-### Start server
+### Start production server
+You may want to change production config like the SSL cert file in config.js
 ```
 yarn start
 ```
-You can change the listening port by defining the environment variable PC_PORT
 
 ### Start debugging server
+You may want to change development config like port in config.js
 ```
 yarn debug
 ```

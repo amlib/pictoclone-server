@@ -5,18 +5,34 @@ import {
   errorsStr,
   decodeMessageHeader, encodeMessage
 } from './src/specs.js'
+import { generateConfig } from "./config.js"
 
-const port = process.env.PC_PORT ? Number(process.env.PC_PORT) : 9001
-global.debug = process.env.PC_DEBUG ? true : false
+let configName
+if (process.env.PICTOCLONE_SERVER_CONFIG_NAME) {
+  configName = process.env.PICTOCLONE_SERVER_CONFIG_NAME
+}
 
+if (configName == null) {
+  configName = 'production'
+}
+
+const config = generateConfig(uWS, configName)
+
+if (config === null) {
+  console.error('Could not find a valid configuration for name ' + configName)
+  process.ext(1)
+}
+
+console.log('Initializing server with config ' + configName)
+const port = config.port
+global.debug = config.debug
 const chatServer = new ChatServer()
 
-const app = uWS.App().ws('/*', {
+const app = uWS[config.ssl ? 'SSLApp' : 'App' ](
+  config.sslParams
+).ws('/*', {
   /* Options */
-  compression: uWS.DISABLED,
-  maxPayloadLength: 32 * 1024, // bytes
-  maxBackpressure: 192 * 1024,
-  idleTimeout: 32,
+  ...config.uwsParams,
   /* Handlers */
   open: (ws) => {
     const response = chatServer.addNewConnection(ws)
