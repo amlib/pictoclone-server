@@ -14,6 +14,7 @@ const app = uWS.App().ws('/*', {
   /* Options */
   compression: uWS.DISABLED,
   maxPayloadLength: 32 * 1024, // bytes
+  maxBackpressure: 192 * 1024,
   idleTimeout: 32,
   /* Handlers */
   open: (ws) => {

@@ -1,4 +1,4 @@
-import { getPngDimensions } from "./Utils.js";
+import {generateRoomCode, generateUniqueId, getPngDimensions} from "./Utils.js";
 import { messageHeight, messageWidth } from "./Message.js";
 
 import {

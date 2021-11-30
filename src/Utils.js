@@ -32,6 +32,11 @@ const generateUniqueId = function () {
   return randomInt(0, e48 - 1) + randomInt(0, e4)
 }
 
+const e32 = 2**32
+const generateRoomCode = function () {
+  return randomInt(0, e32 - 1)
+}
+
 function busyLoop(time, callback) {
   let stop = performance.now();
   while(performance.now() < stop + time) {
@@ -40,4 +45,4 @@ function busyLoop(time, callback) {
   callback();
 }
 
-export { getPngDimensions, generateUniqueId }
+export { getPngDimensions, generateUniqueId, generateRoomCode }

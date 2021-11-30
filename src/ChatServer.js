@@ -1,5 +1,5 @@
 import { ChatRoom } from "./ChatRoom.js";
-import { generateUniqueId } from "./Utils.js";
+import {generateRoomCode, generateUniqueId} from "./Utils.js";
 
 import {
   messageTypesStr, messageTypesInt,
@@ -51,6 +51,12 @@ export class ChatServer {
       this.removeUserFromRoom(currentRoom, ws)
     }
 
+    if (ws.lastCreatedRoom != null && ws.lastCreatedRoom !== currentRoom) {
+      if (ws.lastCreatedRoom.isEmpty()) {
+        this.closeRoom(ws.lastCreatedRoom)
+      }
+    }
+
     this.uniqueIdSocketMap.delete(ws.uniqueId)
   }
 
@@ -61,8 +67,15 @@ export class ChatServer {
     }
   }
 
-  openRoom (code) {
+  openRoom (code = null) {
+    if (code == null) {
+      do {
+        code = generateRoomCode()
+      } while (this.roomCodeMap.get(code) != null)
+    }
+
     global.debug && console.log('ChatServer.openRoom:', code);
+
     const room = new ChatRoom(code)
     this.roomCodeMap.set(room.code, room)
     return room
@@ -148,26 +161,23 @@ export class ChatServer {
     return response
   }
 
-  /* deprecated */
-  handleCreateRoom (message) {
+  handleCreateRoom (message, ws) {
     const response = {
       type: messageTypesStr.get('MSG_TYPE_CREATE_ROOM_RESULT'),
       uniqueId: message.uniqueId
     }
 
-    // const existingRoom = this.roomCodeMap.get(message.code)
-    // if (existingRoom != null) {
-    //   response.success = false
-    //   response.errorCode = errorsStr.get('ERROR_ROOM_ALREADY_EXISTS')
-    //   response.errorMessage = 'Room ' + message.code + ' already exists'
-    //   return response
-    // }
+    if (ws.lastCreatedRoom != null) {
+      if (ws.lastCreatedRoom.isEmpty()) {
+        this.closeRoom(ws.lastCreatedRoom)
+      }
+    }
 
-    // const chatRoom = new ChatRoom(message.code)
-    //
-    // this.roomCodeMap.set(chatRoom.code, chatRoom)
+    const newRoom = this.openRoom()
 
+    ws.lastCreatedRoom = newRoom
     response.success = true
+    response.code = newRoom.code
     return response
   }
 
@@ -177,9 +187,25 @@ export class ChatServer {
       uniqueId: message.uniqueId
     }
 
+    if (ws.room != null) {
+      response.success = false
+      response.errorCode = errorsStr.get('ERROR_ROOM_ALREADY_IN_A_ROOM')
+      response.errorMessage = 'User already in a room'
+      return response
+    }
+
     let existingRoom = this.roomCodeMap.get(message.code)
+
+    // old behaviour of opening rooms with specific codes
+    // if (existingRoom == null) {
+    //   existingRoom = this.openRoom(message.code)
+    // }
+
     if (existingRoom == null) {
-      existingRoom = this.openRoom(message.code)
+      response.success = false
+      response.errorCode = errorsStr.get('ERROR_ROOM_DOES_NOT_EXISTS')
+      response.errorMessage = 'Room ' + message.code + ' does not exists'
+      return response
     }
 
     if (!existingRoom.checkFreeSlot()) {
