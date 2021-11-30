@@ -229,7 +229,7 @@ export class ChatServer {
       return response
     }
 
-    if (message.colorIndex == null || message.colorIndex < 0 || message.colorIndex > (colorIndexSize - 1)) {
+    if (message.colorIndex == null || message.colorIndex < 0 || message.colorIndex > colorIndexSize) {
       response.success = false
       response.errorCode = errorsStr.get('ERROR_INVALID_COLOR_INDEX')
       response.errorMessage = 'Invalid color index'
