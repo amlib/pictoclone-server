@@ -45,6 +45,9 @@ export class ChatRoom {
     ws.publicId = this.topPublicId
     ws.userName = userName
     ws.colorIndex = colorIndex
+
+    this.userListChangeRecipients(ws)
+    return ws.publicId
   }
 
   removeUser (ws) {
@@ -55,6 +58,47 @@ export class ChatRoom {
     ws.publicId = null
     ws.userName = null
     ws.colorIndex = null
+
+    this.userListChangeRecipients(ws)
+  }
+
+  getUserList () {
+    const userList = []
+    for (let ws of this.attachedUsersSockets) {
+      userList.push({
+        userName: ws.userName,
+        colorIndex: ws.colorIndex,
+        publicId: ws.publicId
+      })
+    }
+
+    return userList
+  }
+
+
+  userListChangeRecipients (excludeWs) {
+    const userList = this.getUserList()
+
+    if (!this.open || userList == null || userList.length <= 0) {
+      return
+    }
+
+    const response = {
+      type: messageTypesStr.get('MSG_TYPE_USER_LIST_CHANGE'),
+      uniqueId: 0,
+      userList: userList
+    }
+
+    for (let ws of this.attachedUsersSockets) {
+      if (ws === excludeWs) {
+        continue
+      }
+
+      // response.uniqueId = ws.uniqueId
+
+      global.debug && console.log(`ChatRoom.userListChangeRecipients: dispatching user list change from room ${this.code} to ${ws.userName} (${ws.uniqueId})`)
+      ws.send(encodeMessage(response), true)
+    }
   }
 
   addMessage (message, response, ws) {

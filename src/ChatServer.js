@@ -236,9 +236,8 @@ export class ChatServer {
       return response
     }
 
-    existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex, ws)
-
-    // TODO send publicId back?
+    response.publicId = existingRoom.addUser(message.uniqueId, message.userName, message.colorIndex, ws)
+    response.userList = existingRoom.getUserList()
     response.success = true
     return response
   }
