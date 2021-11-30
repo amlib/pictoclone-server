@@ -6,8 +6,9 @@ import {
   decodeMessageHeader, encodeMessage
 } from './src/specs.js'
 
-const port = 9001
-global.debug = true
+const port = process.env.PC_PORT ? Number(process.env.PC_PORT) : 9001
+global.debug = process.env.PC_DEBUG ? true : false
+
 const chatServer = new ChatServer()
 
 const app = uWS.App().ws('/*', {

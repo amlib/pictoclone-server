@@ -3,6 +3,10 @@
   "version": "0.9.0",
   "license": "GPL-3.0-only",
   "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "debug": "node --inspect index.js"
+  },
   "dependencies": {
     "uWebSockets.js": "uNetworking/uWebSockets.js#v20.4.0",
     "yarn": "^1.22.17"

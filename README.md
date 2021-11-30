@@ -9,11 +9,12 @@ yarn
 
 ### Start server
 ```
-node ./index.js
+yarn start
 ```
+You can change the listening port by defining the environment variable PC_PORT
 
 ### Start debugging server
 ```
-node --inspect index.js
+yarn debug
 ```
 Then use a chrome based browser to attach it's inspector (should happen automatically in a local network once you open the inspector)
